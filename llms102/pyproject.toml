@@ -19,4 +19,4 @@ dependencies = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["llms102"]
+packages = ["llm_lib"]
