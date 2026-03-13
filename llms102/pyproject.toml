@@ -1,0 +1,22 @@
+# pyproject.toml
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "llms102"
+version = "0.1.0"
+description = "The last lesson you will need"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "torch",
+    "transformers",
+    "streamlit",
+    "plotly",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["llms102"]
