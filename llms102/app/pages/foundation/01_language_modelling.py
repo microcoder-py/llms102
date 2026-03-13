@@ -23,17 +23,24 @@ st.divider()
 st.header("1. What is a language model?")
 
 st.markdown("""
-*Research: Bengio 2003 introduction. Write 2-3 sentences in plain english. 
-Answer — what does a language model actually do, not what it seems to do.*
+Languages are not random. We cannot throw in words in any sequence and expect them to make sense. For instance, *The dog ate the cat's food* is a valid sentence. However, *cat eat dog the food* contains all the same words and conveys no meaning. 
+
+The main point here, is that language is based on a set of rules - or statistical properties. This means that we can exploit said statistical property to perform tasks on the language space. 
+            
+The simplest way to imagine this is to think of words as a long chain, with each next word being heavily dependent on the past words, in effect a probability distribution. That is a language model. 
 """)
 
-st.markdown("Formally, given a sequence of tokens $x_1, x_2, ..., x_t$, a language model estimates:")
+
+st.markdown("Considering that most models today primarily target causal language modelling, we focus most on this. Bear in mind, there are other types, such as conditional language models, which we will touch on in further sections")
+
+st.markdown("Formally, given a sequence of tokens $x_1, x_2, ..., x_t$, a causal language model estimates:")
 
 st.latex(r"P(x_t \mid x_1, x_2, \ldots, x_{t-1})")
 
 st.markdown("""
-*Research: Write 2-3 sentences. Answer — what does this formula mean 
-intuitively, what is the model not doing that people assume it is.*
+As we mentioned in the example before, this model in essence sees all existing tokens, and decides what next token would fit best. The precise underlying mechanism for developing the probability distribution is our LLM, which is the focus of AI research on many fronts. 
+            
+For now, focus less on what the function is. What we first need to do is create an intuition for what language modelling itself is. We will study some of its history, and understand how it works. 
 """)
 
 st.divider()
@@ -43,9 +50,11 @@ st.divider()
 st.header("2. Where it began — Markov (1913)")
 
 st.markdown("""
-*Research: Wikipedia summary of Markov 1913 is sufficient. Write 3-4 sentences.
-Answer — what did Markov do, what did he find, why does sequential 
-dependence matter, what does this tell us about language.*
+The formal study of language as a statistical phenomenon began not with a linguist, but with a mathematician trying to prove a point about probability theory.
+
+In 1913, Andrey Markov manually analysed 20,000 characters from Pushkin's novel *Eugene Onegin*, counting sequences of vowels and consonants by hand. What he found was that each letter was not independent — the probability of a vowel or consonant depended heavily on what came before it. Language, at least at the character level, had memory.
+
+This idea — that the next symbol in a sequence depends on preceding symbols — is called the **Markov property**, and it is the statistical foundation every language model is built on, including the transformers we will build in this series.
 """)
 
 st.markdown("""
@@ -60,17 +69,39 @@ st.divider()
 st.header("3. Measuring information — Shannon (1948)")
 
 st.markdown("""
-*Research: Shannon 1948 introduction. Write 2-3 sentences.
-Answer — what is entropy, why does measuring uncertainty matter 
-for language, what did Shannon give us that Markov didn't.*
+If I were to highlight two scientists I aspire to, they would be Alan Turing and Claude Shannon. Shannon in particular was a mathematical genius who focused more on intuition than exact formulation, often needing assistance from others to help translate his brilliance into equations. 
+            
+One of the most influential scientists of the 20th century, he is best known for creating **Information Theory**, the field of study focused on understanding the information content of a probability distribution. This allowed us to create the digital era, being able to encode, transmit and correct data being sent over very noisy channels back in the day. 
+
+A fun side note - his original paper was written in such simple language and formulation that scientists split up into two factions - one who acknowledged his genius, the other unwilling to believe something so simple could have such outlandish consequence. 
+""")
+
+st.divider()
+
+st.markdown("""
+The core idea behind information theory is quite simple - the lower the likelihood of an event's occurence, the more information it provides. 
+            
+For example, if you had a guard dog who barked each night at every passing leaf, you wouldn't care if the dog barked tonight. However, if the dog is always silent, and suddenly barks tonight, you would know there is cause for concern. 
+            
+This inverse relation between how informative an event is and its statistical likelihood form the basis of information theory 
+
+Based on this understanding, and a lot of mathematical wrangling, we arrive at a formula for the information content of an event
+""")
+
+st.latex(r"I(x) = -\log P(x)") 
+
+st.markdown("""
+When averaged over all events, it gives us the average information content of the distribution, otherwise referred to as **Shannon Entropy**
 """)
 
 st.latex(r"H(X) = -\sum_{x} P(x) \log P(x)")
 
 st.markdown("""
-*Research: Write 1-2 sentences unpacking the formula.
-Answer — what does high entropy mean, what does low entropy mean, 
-give a language example.*
+If the entropy of a distribution is very high, it tells us that the events are relatively random, with higher information content per event 
+            
+However, if the entropy is low, it tells us that our probability distribution contains lesser information, i.e. is easier to predict and model  
+            
+This intuition is critical to develop, since entropy is what we use for almost all language modelling - our key intent is to find the probability distribution that matches as closely as possible to natural language. 
 """)
 
 st.markdown("""
