@@ -48,7 +48,7 @@ st.divider()
 st.header("2. Where it began — Markov (1913)")
 
 st.markdown("""
-The formal study of language as a statistical phenomenon began not with a linguist, but with a mathematician trying to prove a point about probability theory.
+The formal mathematical study of sequential dependence in language began not with a linguist, but with a mathematician trying to prove a point about probability theory.
 
 In 1913, Andrey Markov manually analysed 20,000 characters from Pushkin's novel *Eugene Onegin*, counting sequences of vowels and consonants by hand. What he found was that each letter was not independent — the probability of a vowel or consonant depended heavily on what came before it. Language, at least at the character level, had memory.
 
