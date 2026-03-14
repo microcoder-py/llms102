@@ -12,8 +12,9 @@ st.title("Language Modelling")
 st.caption("llms102 — the last lesson you will need")
 
 st.markdown("""
-*Research: Write 2-3 sentences. Answer — what is this page about, 
-what will the reader understand by the end, why does it matter.*
+Languages are not random. We cannot throw in words in any sequence and expect them to make sense. For instance, *The dog ate the cat's food* is a valid sentence. However, *cat eat dog the food* contains all the same words and conveys no meaning. 
+
+The main point here, is that language is based on a set of rules - or statistical properties. This means that we can exploit said statistical property to perform tasks on the language space. 
 """)
 
 st.divider()
@@ -23,10 +24,7 @@ st.divider()
 st.header("1. What is a language model?")
 
 st.markdown("""
-Languages are not random. We cannot throw in words in any sequence and expect them to make sense. For instance, *The dog ate the cat's food* is a valid sentence. However, *cat eat dog the food* contains all the same words and conveys no meaning. 
 
-The main point here, is that language is based on a set of rules - or statistical properties. This means that we can exploit said statistical property to perform tasks on the language space. 
-            
 The simplest way to imagine this is to think of words as a long chain, with each next word being heavily dependent on the past words, in effect a probability distribution. That is a language model. 
 """)
 
@@ -64,9 +62,36 @@ st.markdown("""
 
 st.divider()
 
+st.header("3. Zipf's Law (1935)")
+
+st.markdown("""
+Before we can measure language statistically, it helps to first observe that language *has* measurable statistical structure at all. As an example, we explore Zipf's law. 
+
+In 1935, linguist George Zipf observed that in any large corpus of text, the most frequent word appears roughly twice as often as the second most frequent, three times as often as the third, and so on. Rank a language's vocabulary by frequency, and frequency falls as a power law of rank.
+
+This holds across every language ever studied — English, Mandarin, Arabic, ancient Latin. Language is not random. It is deeply, predictably structured.
+            
+Zipf was not the first to find this power law, but it is still called the Zipf law. In fact, as a linguist, he had a disdain for math, which he did mention in writing. 
+""")
+
+# ── Zipf widget ───────────────────────────────────────────────────────────────
+
+ranks = np.arange(1, 500)
+frequencies = 1 / ranks
+
+fig = px.line(
+    x=np.log(ranks),
+    y=np.log(frequencies),
+    labels={"x": "log(rank)", "y": "log(frequency)"},
+    title="Zipf's Law — word frequency vs rank (log-log scale)"
+)
+st.plotly_chart(fig, use_container_width=True)
+
+st.caption("Zipf, G.K. (1935). The Psycho-Biology of Language.")
+
 # ─── 3. Shannon 1948 ─────────────────────────────────────────────────────────
 
-st.header("3. Measuring information — Shannon (1948)")
+st.header("4. Measuring information — Shannon (1948)")
 
 st.markdown("""
 If I were to highlight two scientists I aspire to, they would be Alan Turing and Claude Shannon. Shannon in particular was a mathematical genius who focused more on intuition than exact formulation, often needing assistance from others to help translate his brilliance into equations. 
@@ -105,42 +130,13 @@ This intuition is critical to develop, since entropy is what we use for almost a
 """)
 
 st.markdown("""
-> Shannon, C.E. (1948). *A Mathematical Theory of Communication.* 
-> Bell System Technical Journal.
-> [PDF](http://math.harvard.edu/~ctm/home/text/others/shannon/entropy/entropy.pdf)
+From entropy we derive **Perplexity** — a more intuitive measure of how surprised the model is by the text it sees. Note that here we use natural log, so perplexity is expressed in nats rather than bits.
 """)
 
-st.divider()
-
-# ─── 4. Shannon 1951 ─────────────────────────────────────────────────────────
-
-st.header("4. Predicting language — Shannon (1951)")
+st.latex(r"PPL = e^{H(p,q)}")
 
 st.markdown("""
-*Research: Read Shannon 1951 introduction and conclusion. Write 3-4 sentences.
-Answer — what was Shannon's prediction experiment, what did he find,
-why is 1 bit per character significant, how does this connect to what 
-a language model does.*
-""")
-
-st.markdown("Cross entropy — how well does our model's predicted distribution match the true distribution:")
-
-st.latex(r"H(p, q) = -\sum_{x} p(x) \log q(x)")
-
-st.markdown("""
-*Research: Write 2-3 sentences.
-Answer — what is p, what is q, what does it mean when cross entropy is high,
-what does it mean when it approaches true entropy.*
-""")
-
-st.markdown("Perplexity — how surprised is the model by the text it sees:")
-
-st.latex(r"PPL = \exp\left(\frac{1}{N}\sum_{i=1}^{N} -\log P(x_i \mid x_{<i})\right)")
-
-st.markdown("""
-*Research: Write 2-3 sentences.
-Answer — what does perplexity of 1 mean, what does perplexity of 100 mean,
-what is a good perplexity for a language model on English text.*
+A perplexity of 2 means the model is choosing between 2 equally likely options at every step. A perplexity of 100 means it is as lost as a random guess among 100 options. Lower is better.
 """)
 
 # ── perplexity widget ─────────────────────────────────────────────────────────
@@ -148,7 +144,7 @@ what is a good perplexity for a language model on English text.*
 st.subheader("Perplexity — interactive")
 
 prob = st.slider(
-    "Average probability assigned to correct token",
+    "Average probability assigned to correct token. Calculated as 1/p, since entropy calculation inverts the base of the logarithm. In the case of language modelling, we always use base e",
     min_value=0.01,
     max_value=1.0,
     value=0.1,
@@ -162,132 +158,105 @@ col1.metric("Perplexity", f"{perplexity:.1f}")
 col2.metric("Avg probability", f"{prob:.2f}")
 
 st.caption(
-    f"A model assigning average probability {prob:.2f} to the correct token "
-    f"is as confused as choosing uniformly among {perplexity:.0f} options at every step."
+    f"Assigning average probability {prob:.2f} to the correct token "
+    f"is equivalent to choosing uniformly among {perplexity:.0f} options at every step."
 )
 
 st.markdown("""
-> Shannon, C.E. (1951). *Prediction and Entropy of Printed English.* 
+> Shannon, C.E. (1948). *A Mathematical Theory of Communication.* 
 > Bell System Technical Journal.
-> [PDF](https://www.princeton.edu/~wbialek/rome/refs/shannon_51.pdf)
+> [PDF](http://math.harvard.edu/~ctm/home/text/others/shannon/entropy/entropy.pdf)
 """)
 
 st.divider()
 
-# ─── 5. N-gram models ────────────────────────────────────────────────────────
+# ─── 4. Shannon 1951 ─────────────────────────────────────────────────────────
 
-st.header("5. N-gram models — Jelinek & Mercer (1980)")
-
-st.markdown("""
-*Research: Any n-gram explainer or Jelinek 1980. Write 2-3 sentences.
-Answer — what is an n-gram model, how does it estimate the next token,
-why was it practical for speech recognition and machine translation.*
-""")
-
-st.latex(r"P(x_t \mid x_1, \ldots, x_{t-1}) \approx P(x_t \mid x_{t-n+1}, \ldots, x_{t-1})")
+st.header("5. Predicting language — Shannon (1951)")
 
 st.markdown("""
-*Research: Write 2-3 sentences on the sparsity problem.
-Answer — why does most of the probability space go unseen,
-what happens when the model encounters an n-gram it has never seen.*
+In his 1951 paper, Shannon asked subjects to guess the next character in a sequence one at a time, given all preceding characters.
+
+Why bother with this? We had already established that language has statistical structure. This paper empirically verified it. Shannon argued that speakers of any language internalise grammar and syntax rules, which amounts to a statistical model — the question was how much certainty that model provides.
+
+Theoretically, with 27 possible characters, the maximum entropy would be:
 """)
+
+st.latex(r"\log_2(27) \approx 4.75 \text{ bits per character}")
 
 st.markdown("""
-*Research: Write 2-3 sentences on the fixed context problem.
-Answer — why is a fixed window a fundamental limitation,
-give a concrete example of a long range dependency it would miss.*
+However, based on his experiments, the estimated uncertainty was only **1 bit per character** — indicating that at the character level, English is almost 80% predictable.
+
+This finding is significant for language modelling — it gives us a lower bound on perplexity:
 """)
 
-# ── n-gram context widget ─────────────────────────────────────────────────────
-
-st.subheader("Context window — interactive")
+st.latex(r"2^1 = 2")
 
 st.markdown("""
-*Write one sentence directing the reader to use the slider below.*
+Meaning a perfect language model would almost never be surprised by the next character. Modern LLMs with subword tokenization already achieve single digit perplexities, coming remarkably close to Shannon's theoretical limit.
 """)
 
-sentence = "The keys that were left on the table by the door were missing"
-words = sentence.split()
+st.header("6. Cross Entropy & KL Divergence")
 
-n = st.slider("N-gram order (n)", min_value=2, max_value=6, value=3)
+st.markdown("""
+Shannon gave us a way to measure the intrinsic uncertainty of a distribution. But in language modelling, we have two distributions to contend with — the true distribution of language, and our model's approximation of it.
 
-context = words[-(n):-1]
-target = words[-1]
-ignored = words[:-(n)]
+The true distribution $p$ represents natural language as it actually is — the real probabilities of every possible sequence. We never have direct access to this. What we have is text, which are samples drawn from $p$.
+
+Our model produces a distribution $q$ — its best guess at $p$ given what it has learned. The question becomes: how do we measure how wrong $q$ is?
+""")
+
+st.markdown("**Cross entropy** measures the average number of bits needed to encode events from $p$ using a code optimised for $q$:")
+
+st.latex(r"H(p, q) = -\sum_{x} p(x) \log q(x)")
+
+st.markdown("""
+When our model is perfect and $q = p$, cross entropy equals Shannon entropy — we are encoding language as efficiently as possible. When our model is wrong, cross entropy is higher. The difference between the two is the **KL Divergence**:
+""")
+
+st.latex(r"D_{KL}(p \| q) = H(p, q) - H(p)")
+
+st.markdown("""
+KL divergence measures the information lost by using $q$ instead of $p$. It is always non-negative — you can never do better than the true distribution — and equals zero only when $q = p$ exactly.
+
+This gives us a clean picture of what language modelling actually is:
+""")
 
 col1, col2, col3 = st.columns(3)
-col1.markdown("**Predicting**")
-col1.code(target)
-col2.markdown("**Context used**")
-col2.code(" ".join(context))
-col3.markdown("**Context ignored**")
-col3.code(" ".join(ignored) if ignored else "nothing")
+col1, col2, col3 = st.columns(3)
 
-st.caption(
-    f"A {n}-gram model sees only {n-1} preceding word(s). "
-    f"Everything before is invisible regardless of how relevant it is."
-)
+col1.markdown("**Shannon Entropy H(p)**")
+col1.markdown("Intrinsic uncertainty of language — the theoretical lower bound we cannot beat.")
+
+col2.markdown("**Cross Entropy H(p,q)**")
+col2.markdown("What our model actually achieves — always ≥ H(p).")
+
+col3.markdown("**KL Divergence**")
+col3.markdown("The gap between our model and reality — what training tries to close.")
 
 st.markdown("""
-> Jelinek, F. & Mercer, R.L. (1980). *Interpolated Estimation of Markov Source 
-> Parameters from Sparse Data.* Pattern Recognition in Practice.
+Training a language model is simply minimising cross entropy over text samples. Since $H(p)$ is fixed — we cannot change the intrinsic uncertainty of language — minimising cross entropy is equivalent to minimising KL divergence, pulling our model's distribution as close as possible to the true distribution of natural language.
 """)
 
 st.divider()
 
-# ─── 6. Neural language models ───────────────────────────────────────────────
-
-st.header("6. Neural language models — Bengio et al. (2003)")
-
 st.markdown("""
-*Research: Read Bengio 2003 sections 1 and 2. Write 2-3 sentences.
-Answer — what is the key idea, how do embeddings solve the sparsity problem,
-why does similarity in embedding space help generalisation.*
+Language is statistical. That is all we need to know to begin.
+
+What follows is the story of building a parametric function $f_\\theta$ that approximates the true distribution of language $p$ as closely as possible:
 """)
 
-st.markdown("""
-*Research: Write 2-3 sentences.
-Answer — what does the neural language model learn that n-grams cannot,
-what is the architecture at a high level, why is it a step change.*
-""")
+st.latex(r"q_\theta(x_t \mid x_{<t}) \approx p(x_t \mid x_{<t})")
 
 st.markdown("""
-> Bengio, Y., Ducharme, R., Vincent, P., & Jauvin, C. (2003). 
-> *A Neural Probabilistic Language Model.* 
-> Journal of Machine Learning Research, 3, 1137–1155.
-> [PDF](https://www.jmlr.org/papers/volume3/bengio03a/bengio03a.pdf)
+Information theory gives us the tools to measure how well we are doing — entropy tells us the theoretical limit, cross entropy tells us where we are, and KL divergence tells us how far we have to go.
+
+The rest is just finding $\\theta$, which happens to be our LLM.  
+            
+Of course, as we dive deeper into the course, we will also see other methods of updating parameters to better suit our needs, but it's only a question of _how_ we want $\\theta$ to operate.
 """)
 
 st.divider()
-
-# ─── 7. The problem that remained ────────────────────────────────────────────
-
-st.header("7. The problem that remained")
-
-st.markdown("""
-*Research: No paper needed — reason from what you know. Write 2-3 sentences.
-Answer — what fundamental limitation persisted even in neural language models,
-why does a fixed context window matter even when embeddings are rich.*
-""")
-
-st.markdown("""
-*Research: Write 2-3 sentences on RNNs.
-Answer — what did RNNs attempt, why did they fail in practice,
-what is the vanishing gradient problem in one sentence.*
-""")
-
-st.markdown("""
-*Research: Write 2-3 sentences — the cliff hanger.
-Answer — what mechanism would solve long range dependencies,
-what would it need to be able to do that n-grams and RNNs could not.*
-""")
-
-st.divider()
-
-# ─── Footer ──────────────────────────────────────────────────────────────────
-
-col1, col2 = st.columns([1, 5])
-col1.page_link("pages/foundation/02_tokenization.py", label="Next: Tokenization →")
 
 st.markdown("""
 **Further reading**
