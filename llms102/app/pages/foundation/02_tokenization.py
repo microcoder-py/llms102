@@ -337,7 +337,11 @@ if sentence:
     col3.metric("Avg token length", round(sum(len(t) for t in tokens) / len(tokens), 1))
 
     st.markdown("**Tokens**")
-    st.code(" | ".join(repr(t) for t in tokens), language=None)
+    html = ""
+    for i, token in enumerate(tokens):
+        color = COLORS[i % len(COLORS)]
+        html += f"<span style='background:{color};padding:2px 6px;border-radius:3px;margin:2px;display:inline-block;color:black'>{repr(token)}</span>"
+    st.markdown(html, unsafe_allow_html=True)
 
     st.markdown("**Token table**")
     st.dataframe(
