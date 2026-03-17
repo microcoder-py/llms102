@@ -9,6 +9,8 @@ import tiktoken
 import graphviz
 from transformers import AutoTokenizer 
 from tokenizers import Encoding
+import math
+from collections import Counter
 
 st.set_page_config(page_title="Tokenization | llms102", layout="wide")
 
@@ -487,219 +489,271 @@ if backend.post_processor is not None:
     st.write(str([backend.id_to_token(id) for id in post_processed.ids]))
 else:
     st.info(f"The `{model_name}` tokenizer has no post-processing step.")
+
 st.divider()
+
+st.header("The Design of Tokenizers") 
+
+st.markdown("""
+As we saw above, each tokenizer has distinct steps to it. Not all tokenizers use normalization, pre-tokenization may be different or absent, the underlying model for tokenization may be different, and the postprocessing may be different. There are too many different algorithms to cover, so here we will discuss primarily the ways in which designs are split, and provide reference material for anyone interested. 
+""")
+
+st.subheader("Tokenization Model")
+
+st.markdown("""
+Broadly, there are two mechanisms through which we exploit statistical properties of language. 
+            
+1. **Morphology based** - custom rules written by experts with research on the linguistics of the corpora or language. This encodes the true underlying nature of the language to the best possible extent, but is hard to implement, and not scalable to new distributions or languages
+2. **Data Based** - algorithms that automatically create tokens with specific objectives in mind, such as minimizing vocabulary, or achieving maximum compression. These are automatic and highly scalable but tend to cause issues with true language understanding (which we will cover soon) 
+            
+For the most part, frontier LLMs use data based models, and not morphology based, primarily for the ease of scaling and adaptation. 
+""")
+
+
+#TODO Verify all claims in table below 
+st.dataframe(
+    pd.DataFrame({
+        "Algorithm": [
+            "Byte-level BPE",
+            "Unigram Language Model",
+            "WordPiece",
+            "SentencePiece",
+        ],
+        "Core idea": [
+            "BPE applied to raw bytes instead of characters — eliminates out-of-vocabulary tokens entirely",
+            "Start with a large vocabulary and prune tokens whose removal least increases corpus loss",
+            "Like BPE but merges are chosen by maximum likelihood rather than frequency",
+            "Not an algorithm — a framework that runs BPE or Unigram on raw text without pre-tokenization",
+        ],
+        "Used by": [
+            "GPT-4o, LLaMA 3, Mistral, Claude, Gemini",
+            "Gemma 2",
+            "ModernBERT (2024)",
+            "Gemma 2, LLaMA 3 (as the framework wrapping BPE)",
+        ],
+        "Vocabulary direction": [
+            "Bottom-up (builds up from bytes)",
+            "Top-down (prunes from large vocabulary)",
+            "Bottom-up (builds up from characters)",
+            "Depends on underlying algorithm",
+        ],
+    }),
+    use_container_width=True,
+    hide_index=True,
+)
+with st.expander("**Further Reading**", expanded=False):
+    st.markdown("""
+    **WordPiece**
+    - Paper: *BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding*  
+    https://arxiv.org/abs/1810.04805  
+    - Blog: https://huggingface.co/learn/nlp-course/chapter6/6  
+    - GitHub (reference implementations): https://github.com/huggingface/tokenizers  
+
+    **Unigram Language Model**
+    - Paper: *Subword Regularization: Improving Neural Network Translation Models with Multiple Subword Candidates*  
+    https://arxiv.org/abs/1804.10959  
+    - Blog: https://huggingface.co/learn/nlp-course/chapter6/7  
+    - GitHub (SentencePiece implementation): https://github.com/google/sentencepiece  
+
+    **SentencePiece**
+    - Paper: *SentencePiece: A simple and language independent subword tokenizer*  
+    https://arxiv.org/abs/1808.06226 :contentReference[oaicite:0]{index=0}  
+    - GitHub: https://github.com/google/sentencepiece :contentReference[oaicite:1]{index=1}  
+    - Notes: Supports both BPE and Unigram LM, and trains directly on raw text without pre-tokenization :contentReference[oaicite:2]{index=2}  
+
+    **Byte-level BPE**
+    - Paper: *Neural Machine Translation of Rare Words with Subword Units* (BPE origin)  
+    https://arxiv.org/abs/1508.07909  
+    - Blog: https://huggingface.co/learn/nlp-course/chapter6/5  
+    - GitHub (GPT-style / fast tokenizers): https://github.com/huggingface/tokenizers  
+    """)
+#TODO: Find resources to read up on each tokenizer
+
+st.divider() 
 
 st.header("How Do We Evaluate Tokenizers?")
 
-st.markdown("") # brief intro
+st.markdown("""
+At present, we generally train the tokenizer independently of the model. There are issues that arise from this as well as some fixes, which we will discuss later, but for now, consider the tokenizer to be a separate system in its own regard that is trained independently of the LLM.
+
+Tokenizer quality can be measured before a single model is trained. The metrics below cover four dimensions — how well it covers a language, how efficiently it encodes text, whether its splits make linguistic sense, and whether it helps the model perform well downstream.
+            
+Once again, this is a highly specialised field, and the below is only an intuition for baseline knowledge, not the complete picture. 
+""")
+
 
 sections = {
-    "Vocabulary and Coverage": [
-        "Vocabulary Size",
-        "Out-of-Vocabulary Rate",
-        "Type-Token Ratio",
-    ],
-    "Fertility and Efficiency": [
-        "Fertility",
-        "Compression Ratio",
-        "Normalized Sequence Length",
-        "Continued Word Ratio",
-        "Rényi Efficiency",
-    ],
-    "Linguistic Alignment": [
-        "Morphological Alignment",
-        "Cognitive Plausibility",
-    ],
-    "Downstream Task Performance": [
-        "Perplexity",
-        "Bits Per Character",
-        "Cross-Lingual Transfer Gap",
-    ],
+    "Vocabulary and Coverage": {
+        "Vocabulary Size": "The total number of unique tokens the tokenizer knows. Larger means better coverage but a bigger embedding matrix and more model parameters.",
+        "Out-of-Vocabulary Rate": "How often the tokenizer sees a token it has never encountered. Subword tokenizers reduce this by splitting unknown words into known pieces.",
+        "Type-Token Ratio": "The fraction of tokens in a text that are unique. High values mean more variety — agglutinative languages like Finnish and Turkish score highest.",
+    },
+    "Fertility and Efficiency": {
+        "Fertility": "The average number of tokens a word gets split into. A fertility of 1.0 is ideal — higher means longer sequences, more compute, and less effective context.",
+        "Compression Ratio": "How many characters fit into a single token on average. Higher is more efficient — GPT-family tokenizers achieve roughly 4 bytes per token on English.",
+        "Normalized Sequence Length": "How much longer a tokenized sequence is in one language versus English. A score above 1.0 means that language is being penalised.",
+        "Continued Word Ratio": "The fraction of words split into more than one token. Lower is better — a high ratio signals the tokenizer is poorly matched to the language.",
+        "Rényi Efficiency": "Whether the vocabulary is used evenly. A skewed distribution — where a few tokens dominate and most are rarely seen — wastes vocabulary capacity.",
+    },
+    "Linguistic Alignment": {
+        "Morphological Alignment": "Whether token boundaries fall at morpheme boundaries. Better alignment means the model receives cleaner linguistic signal.",
+        "Cognitive Plausibility": "Whether the tokenizer struggles with the same sequences humans find hard to read — a proxy for how naturally learnable the representations are.",
+    },
+    "Downstream Task Performance": {
+        "Perplexity": "How surprised the model is by unseen text. Lower is better — but only comparable across models using the exact same tokenizer.",
+        "Bits Per Character": "Perplexity normalised by character count rather than token count. The go-to metric for fairly comparing models with different tokenizers.",
+        "Cross-Lingual Transfer Gap": "How much worse a model performs on non-English languages. When this correlates with high fertility, the tokenizer is partly to blame.",
+    },
 }
 
 for section_title, topics in sections.items():
     st.subheader(section_title)
+    topic_key = list(topics.keys())
+    tabs = st.tabs(list(topics.keys()))
     
-    tldr, full = st.tabs(["Intuition", "Full Explanation"])
-    with tldr:
-        st.markdown("")
-    with full:
-        st.markdown("")
+    for i in range(len(tabs)):
+        with tabs[i]:
+            st.markdown(topics[topic_key[i]])
 
-    st.divider()
-# ─── Character, word, subword ─────────────────────────────────────────────
+st.header(f"Simple Evaluation Calculator")
+tokenizer_name = st.text_input("HuggingFace Tokenizer (model name)", value="gpt2")
+input_text = st.text_area("Input Text", value="This is a simple example to demonstrate how tokenization works.")
 
-st.header("2. Character, word, and subword tokenization")
+@st.cache_resource
+def load_tokenizer(name):
+    return AutoTokenizer.from_pretrained(name)
 
-st.markdown("")  # study: HuggingFace tokenizer docs
-                 # answer: tradeoffs of each, why subword won
+if tokenizer_name:
+    try:
+        tokenizer = load_tokenizer(tokenizer_name)
+    except Exception as e:
+        st.error(f"Failed to load tokenizer: {e}")
+        st.stop()
 
-col1, col2, col3 = st.columns(3)
 
-col1.markdown("**Character-level**")
-col1.markdown("")  # one line — the failure mode
+if input_text:
+    # --- TOKENIZATION ---
+    encoding = tokenizer(input_text, add_special_tokens=False, return_offsets_mapping=True)
+    tokens = tokenizer.convert_ids_to_tokens(encoding["input_ids"])
+    offsets = encoding["offset_mapping"]
 
-col2.markdown("**Word-level**")
-col2.markdown("")  # one line — the failure mode
+    words = input_text.split()
 
-col3.markdown("**Subword**")
-col3.markdown("")  # one line — why it works
+    # --- METRICS ---
+    num_tokens = len(tokens)
+    num_words = len(words)
+    num_chars = len(input_text)
 
-st.divider()
+    fertility = num_tokens / num_words if num_words else 0
+    compression_ratio = num_chars / num_tokens if num_tokens else 0
 
-# ─── 3. Byte Pair Encoding ───────────────────────────────────────────────────
+    # Continued word ratio via offsets
+    word_splits = []
+    for word in words:
+        sub_tokens = tokenizer.tokenize(word)
+        word_splits.append(len(sub_tokens))
 
-st.header("3. Byte Pair Encoding — Sennrich et al. (2016)")
+    continued_word_ratio = sum(1 for c in word_splits if c > 1) / num_words if num_words else 0
 
-st.markdown("")  # study: Sennrich et al. 2016 arxiv 1508.07909
-                 # answer: how BPE builds vocabulary iteratively, what a merge rule is
+    token_counts = Counter(tokens)
+    probs = [c / num_tokens for c in token_counts.values()]
+    renyi_entropy = -math.log(sum(p**2 for p in probs)) if probs else 0
 
-# ── BPE merge widget ──────────────────────────────────────────────────────────
-
-st.subheader("BPE merges — interactive")
-
-st.markdown("")  # one sentence directing the reader
-
-word = st.text_input("Enter a word", value="tokenization")
-chars = list(word)
-
-steps = []
-current = list(word)
-steps.append(("Initial split", list(current)))
-
-pairs = {}
-for i in range(len(current) - 1):
-    pair = (current[i], current[i+1])
-    pairs[pair] = pairs.get(pair, 0) + 1
-
-if pairs:
-    best = max(pairs, key=pairs.get)
-    merged = []
-    i = 0
-    while i < len(current):
-        if i < len(current) - 1 and (current[i], current[i+1]) == best:
-            merged.append(current[i] + current[i+1])
-            i += 2
-        else:
-            merged.append(current[i])
-            i += 1
-    steps.append((f"Merge: '{best[0]}' + '{best[1]}'", merged))
-
-for step_name, tokens in steps:
-    st.markdown(f"**{step_name}**")
-    cols = st.columns(len(tokens))
-    for i, (col, token) in enumerate(zip(cols, tokens)):
-        col.markdown(
-            f"<div style='background:{COLORS[i % len(COLORS)]};padding:8px;border-radius:4px;text-align:center;color:black'>{token}</div>",
-            unsafe_allow_html=True
-        )
-    st.markdown("")
-
-st.markdown("""
-> Sennrich, R., Haddow, B., & Birch, A. (2016). *Neural Machine Translation of 
-> Rare Words with Subword Units.* ACL 2016.
-> [arxiv 1508.07909](https://arxiv.org/abs/1508.07909)
-""")
-
-st.divider()
-
-# ─── 4. WordPiece & SentencePiece ────────────────────────────────────────────
-
-st.header("4. WordPiece & SentencePiece")
-
-st.markdown("")  # study: Kudo & Richardson 2018 arxiv 1808.06226
-                 # answer: how WordPiece differs from BPE, what SentencePiece adds, which models use which
-
-st.markdown("""
-> Kudo, T. & Richardson, J. (2018). *SentencePiece: A simple and language 
-> independent subword tokenizer.*
-> [arxiv 1808.06226](https://arxiv.org/abs/1808.06226)
-""")
-
-st.divider()
-
-# ─── 5. Vocabulary size ──────────────────────────────────────────────────────
-
-st.header("5. Vocabulary size and its consequences")
-
-st.markdown("")  # study: reason from first principles
-                 # answer: too small vs too large, effect on embedding table size
-
-# ── vocabulary size widget ────────────────────────────────────────────────────
-
-st.subheader("Vocabulary size vs embedding table — interactive")
-
-col1, col2 = st.columns(2)
-vocab_size = col1.slider("Vocabulary size", min_value=1000, max_value=100000, value=50000, step=1000)
-embedding_dim = col2.slider("Embedding dimension", min_value=64, max_value=4096, value=768, step=64)
-
-params = vocab_size * embedding_dim
-size_mb = (params * 4) / (1024 ** 2)
-
-col1, col2, col3 = st.columns(3)
-col1.metric("Total parameters", f"{params:,}")
-col2.metric("Size (float32)", f"{size_mb:.1f} MB")
-col3.metric("% of 125M model", f"{(params / 125e6) * 100:.1f}%")
-
-st.divider()
-
-# ─── 6. Tokenization artifacts ───────────────────────────────────────────────
-
-st.header("6. Tokenization artifacts")
-
-st.markdown("")  # study: observe a real tokenizer
-                 # answer: whitespace sensitivity, numbers, code, multilingual
-
-# ── token visualizer widget ───────────────────────────────────────────────────
-
-st.subheader("Token visualizer — interactive")
-
-st.markdown("")  # one sentence directing the reader
-
-user_text = st.text_area(
-    "Enter any text",
-    value="The quick brown fox jumped over the lazy dog. 1 + 1 = 2.",
-    height=100
-)
-
-if user_text:
-    tokens = tokenizer.encode(user_text)
-    token_strings = [tokenizer.decode([t]) for t in tokens]
-
-    st.markdown("**Tokens:**")
+    # --- DISPLAY ---
+    
+    st.markdown("**Tokens**")
+               
     html = ""
-    for i, token in enumerate(token_strings):
+    for i, token in enumerate(tokens):
         color = COLORS[i % len(COLORS)]
         html += f"<span style='background:{color};padding:2px 6px;border-radius:3px;margin:2px;display:inline-block;color:black'>{repr(token)}</span>"
     st.markdown(html, unsafe_allow_html=True)
 
+    st.subheader("Token Statistics")
+
     col1, col2, col3 = st.columns(3)
-    col1.metric("Characters", len(user_text))
-    col2.metric("Tokens", len(tokens))
-    col3.metric("Chars per token", f"{len(user_text)/len(tokens):.2f}")
 
+    col1.metric("# Tokens", num_tokens)
+    col2.metric("# Words", num_words)
+    col3.metric("# Characters", num_chars)
+
+stats = {
+    "Metric": [
+        "Fertility",
+        "Compression Ratio",
+        "Continued Word Ratio",
+        "Rényi Efficiency",
+        "Num Tokens",
+        "Num Words",
+        "Num Characters"
+    ],
+    "Value": [
+        fertility,
+        compression_ratio,
+        continued_word_ratio,
+        renyi_entropy,
+        num_tokens,
+        num_words,
+        num_chars
+    ],
+    "Notes": [
+        "Average tokens per word. Ideal ≈ 1. Higher → more fragmentation.",
+        "Characters per token. Higher → more efficient encoding.",
+        "Fraction of words split into multiple tokens. Lower is better.",
+        "Token distribution evenness (order-2 entropy). Higher → better vocab usage.",
+        "Total tokens after tokenization.",
+        "Total whitespace-separated words in input.",
+        "Total number of characters in input text."
+    ]
+}
+
+df = pd.DataFrame(stats)
+
+st.dataframe(df, use_container_width=True, hide_index=True)
 st.divider()
 
-# ─── 7. What the model never sees ────────────────────────────────────────────
+#TODO: Add URLs for each specific algorithm 
 
-st.header("7. What the model never sees")
+st.header("Why nobody likes Tokenizers") 
 
-st.markdown("")  # study: reason from first principles
-                 # answer: model sees ids not text, what is lost, why tokenization affects capabilities
+st.markdown("""
+A year or so ago, I came across a [tweet by Andrej Karpathy](https://x.com/karpathy/status/1759996551378940395). It quoted the following: 
+            
+Tokenization is at the heart of much weirdness of LLMs. Do not brush it off.
 
-example = "Hello, world!"
-token_ids = tokenizer.encode(example)
-
-st.markdown(f"**Input:** `{example}`")
-st.markdown(f"**Token IDs:** `{token_ids}`")
-st.markdown(f"**Vocabulary size:** `{tokenizer.vocab_size:,}`")
-
+- Why can't LLM spell words? **Tokenization.**
+- Why can't LLM do super simple string processing tasks like reversing a string? **Tokenization.**
+- Why is LLM worse at non-English languages (e.g. Japanese)? **Tokenization.**
+- Why is LLM bad at simple arithmetic? **Tokenization.**
+- Why did GPT-2 have more than necessary trouble coding in Python? **Tokenization.**
+- Why did my LLM abruptly halt when it sees the string "<|endoftext|>"? **Tokenization.**
+- What is this weird warning I get about a "trailing whitespace"? **Tokenization.**
+- Why the LLM break if I ask it about "SolidGoldMagikarp"? **Tokenization.**
+- Why should I prefer to use YAML over JSON with LLMs? **Tokenization.**
+- Why is LLM not actually end-to-end language modeling? **Tokenization.**
+- What is the real root of suffering? **Tokenization.**
+""")
 st.divider()
 
-# ─── Footer ──────────────────────────────────────────────────────────────────
+st.markdown("""
+I never really bothered to follow up on the why, or go through his [two hours plus lecture](https://www.youtube.com/watch?v=zduSFxRajkE) on the subject. I chuckled at the vitriol, and forgot about it. I should have paid heed to his warning and not brushed it off. 
+            
+As it turns out, there are several deficiencies in the current way we implement tokenizers. Karpathy goes on to suggest that we should remove this step entirely, and make models independent of tokenization. 
+""")
 
-col1, col2 = st.columns([1, 5])
-col1.page_link("pages/foundation/03_embeddings.py", label="Next: Embeddings →")
+st.subheader("Tokenizers are a separate subsystem")
+
+st.markdown("""
+In the end what we really want is that the combination of the tokenizer and the model perform language modelling well. 
+
+Ideally, we should be able to train them jointly, and while there are methods to do so, for the most part current pipelines use tokenization owing to the difficulty of optimizing over discrete segments. To be clear, it's hard, not impossible - there are some methods that do so, but not at scale.  The space for segmentaton is combinatorial, discrete in nature and non differentiable, making optimization harder. 
+
+Tokenizers operate in a discrete space causing a non differentiable step, which is then projected into continous space using embedding layers (to be discussed in the next chapter). It is in the continous space where the actual analysis and understanding occurs, but this continous space is heavily influenced by the tokens themselves. If tokenization does not preserve the original relations between morphemes or other linguistic entities, we can lose out on critical information. 
+
+Even if a tokenizer performs extremely well on all the statistics that we mentioned above, it can and does lead to strange outcomes with the LLM, as Karpathy highlighted. For example, a model could have artificially good fertility because of the underlying nature of the language, while an agglutinative language would have artificially poor fertility because of compositionality (data based tokenization models would break down combination words frequently, causing more tokens per word). These metrics are heavily dependent on language structure and cannot be summarized purely by the metrics.  
+            
+Let's dive a little deeper into what issues arise. 
+""")
 
 st.markdown("""
 **Further reading**
