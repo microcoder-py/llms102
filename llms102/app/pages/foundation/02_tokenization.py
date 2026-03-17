@@ -6,6 +6,9 @@ import plotly.express as px
 from transformers import GPT2Tokenizer
 import pandas as pd
 import tiktoken
+import graphviz
+from transformers import AutoTokenizer 
+from tokenizers import Encoding
 
 st.set_page_config(page_title="Tokenization | llms102", layout="wide")
 
@@ -21,7 +24,15 @@ COLORS = [
 st.title("Tokenization")
 st.caption("How we translate language space into numerical space")
 
-st.markdown("")  # 2 sentences — what this page covers
+st.markdown("""
+Honestly, when I started this lesson, I assumed I would explain that we split text into multiple parts, show you how it could be done, and end it.  
+            
+Instead, I find myself down a serious rabbit hole. Tokenizers are an incredibly complex field, and have massive downstream effects on model training and capabilities.
+            
+Having acknowledged this, I encourage you very strongly to read this part in as much depth as you possibly can. It is definitely conceptually interesting, and these might be challenges you'll face especially when you build multilingual systems. 
+            
+Over time, as and when I find new information worth highlighting, I will be adding it here.
+""") 
 
 st.divider()
 
@@ -32,7 +43,7 @@ st.header("Intuition behind tokenization")
 st.markdown("""
 So we understand that languages have statistical properties, and that these properties can be exploited to create a language model. However, machine learning requires numbers to operate, not text. So we need to find a way to describe languages as numbers in order to process them. 
             
-Tokenization is exactly this process. We divide the language space up into chunks that are represented in the numerical space. 
+Tokenization is exactly this process. We divide the language space up into chunks that are represented in the numerical space. Mind you, there are some tokenization free methods as well, but they are typically not used at scale. All the best LLMs of today use tokenization explicitly, which technically makes LLMs a two step system, and not an end to end system. 
             
 How we present this distribution matters a lot. For instance, let's say that we had to find a statistical method to distinguish cars. We could create a table that considers body length, color, and wheel size, the combination of which is likely to be sufficiently unique to distinguish between cars. However, we lose out on any possible information related to say engine performance. 
             
@@ -355,6 +366,127 @@ if sentence:
         hide_index=True,
     )
 
+st.divider()
+
+st.header("Tokenizers under the hood")
+
+st.markdown("""
+In this section, we will look into the general steps of tokenizer execution, which is important to understand if you ever want to build one of your own. I will be using HuggingFace's `tokenizers` library, and will only provide the abstracted information, since the in-depth tutorials have already been written (which I will share URLs for)
+""")
+graph = graphviz.Digraph(
+    graph_attr={"rankdir": "TB"},
+    node_attr={"fontname": "Helvetica"}
+)
+
+# Main pipeline nodes
+graph.node("Normalization", shape="box", style="filled", fillcolor="lightblue")
+graph.node("Pre-tokenization", shape="box", style="filled", fillcolor="lightblue")
+graph.node("Model", shape="box", style="filled", fillcolor="lightblue")
+graph.node("Postprocessor", shape="box", style="filled", fillcolor="lightblue")
+
+# Explanation nodes
+graph.node("exp1", label="Cleans and standardizes\nraw text", shape="note", fillcolor="lightyellow", style="filled")
+graph.node("exp2", label="Splits text into\ninitial chunks", shape="note", fillcolor="lightyellow", style="filled")
+graph.node("exp3", label="Applies BPE/WordPiece\nalgorithm", shape="note", fillcolor="lightyellow", style="filled")
+graph.node("exp4", label="Adds special tokens\nlike [CLS], [SEP]", shape="note", fillcolor="lightyellow", style="filled")
+
+# Main pipeline edges
+graph.edge("Normalization", "Pre-tokenization")
+graph.edge("Pre-tokenization", "Model")
+graph.edge("Model", "Postprocessor")
+
+# Explanation edges (dashed)
+graph.edge("exp1", "Normalization", style="dashed", arrowhead="none")
+graph.edge("exp2", "Pre-tokenization", style="dashed", arrowhead="none")
+graph.edge("exp3", "Model", style="dashed", arrowhead="none")
+graph.edge("exp4", "Postprocessor", style="dashed", arrowhead="none")
+
+# Force explanation nodes to the left using same rank
+with graph.subgraph() as s:
+    s.attr(rank="same")
+    s.node("exp1")
+    s.node("Normalization")
+
+with graph.subgraph() as s:
+    s.attr(rank="same")
+    s.node("exp2")
+    s.node("Pre-tokenization")
+
+with graph.subgraph() as s:
+    s.attr(rank="same")
+    s.node("exp3")
+    s.node("Model")
+
+with graph.subgraph() as s:
+    s.attr(rank="same")
+    s.node("exp4")
+    s.node("Postprocessor")
+
+st.graphviz_chart(graph)
+model_name = st.text_input("Enter a tokenizer model name", value="google-bert/bert-base-uncased", key="model_name")
+toktext = st.text_input("Enter text to tokenize", value="Hello how are u tday? This is a horrendously inexplicable sentence. Pneumonoultramicroscopicsilicovolcanoconiosis", key="tokenizer_text")
+
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+backend = tokenizer.backend_tokenizer
+
+st.markdown(f"We will use the `{model_name}` tokenizer.")
+st.code(f"tokenizer = AutoTokenizer.from_pretrained(\"{model_name}\")\nprint(type(tokenizer.backend_tokenizer))", language="python")
+st.markdown(f"`{type(backend)}`")
+
+st.subheader("What happens when you call `tokenizer.encode`")
+st.markdown(f"Most of us use `tokenizer.encode()` and call it a day. What's happening under the hood though? All of the above steps are run in sequence under the hood. Here is the final output for `\"{toktext}\"`:")
+st.code(f"tokenizer.encode(\"{toktext}\")", language="python")
+final_tokens = tokenizer.convert_ids_to_tokens(tokenizer.encode(toktext))
+st.write(str(final_tokens))
+st.markdown("Let's see what the full pipeline looks like end to end.")
+
+# Normalization
+st.subheader("Normalization")
+if backend.normalizer is not None:
+    st.markdown("The first step is to normalize the text — lowercasing, stripping accents, removing punctuation etc. This varies per tokenizer.")
+    st.code(f"tokenizer.backend_tokenizer.normalizer.normalize_str(\"{toktext}\")", language="python")
+    normed_text = backend.normalizer.normalize_str(toktext)
+    st.write(f"`{normed_text}`")
+else:
+    st.info(f"The `{model_name}` tokenizer has no normalization step.")
+    normed_text = toktext
+
+# Pre-tokenization
+st.subheader("Pre-tokenization")
+if backend.pre_tokenizer is not None:
+    st.markdown("Splits the (normalized) text into initial chunks. The numbers are character offsets.")
+    st.code(f"tokenizer.backend_tokenizer.pre_tokenizer.pre_tokenize_str(\"{normed_text}\")", language="python")
+    pre_tokenized = backend.pre_tokenizer.pre_tokenize_str(normed_text)
+    st.write(str(pre_tokenized))
+    pre_tokenized_words = [word for word, _ in pre_tokenized]
+else:
+    st.info(f"The `{model_name}` tokenizer has no pre-tokenization step.")
+    pre_tokenized_words = [normed_text]
+
+# Model
+# Model
+st.subheader("Model")
+if backend.model is not None:
+    st.markdown("Applies the core tokenization algorithm (e.g. BPE, WordPiece) to produce tokens. You may see some extra tokens like ## or G with accents, these are tokenizer specific implementations for describing whitespaces, newlines, etc.")
+    st.code(f"tokens = []\nfor word in {pre_tokenized_words}:\n    tokens.extend(tokenizer.backend_tokenizer.model.tokenize(word))", language="python")
+    tokens = []
+    for word in pre_tokenized_words:
+        tokens.extend(backend.model.tokenize(word))
+    st.write(str([t.value for t in tokens]))
+else:
+    st.info(f"The `{model_name}` tokenizer has no model step.")
+    tokens = []
+
+# Post-processing
+st.subheader("Post-processing")
+if backend.post_processor is not None:
+    st.markdown("Adds special tokens (e.g. `[CLS]`, `[SEP]` for `bert` model family) and formats output for the model.")
+    encoding = backend.encode(normed_text, add_special_tokens=False)
+    st.code(f"tokenizer.backend_tokenizer.post_processor.process(encoding)", language="python")
+    post_processed = backend.post_processor.process(encoding)
+    st.write(str([backend.id_to_token(id) for id in post_processed.ids]))
+else:
+    st.info(f"The `{model_name}` tokenizer has no post-processing step.")
 st.divider()
 
 st.header("How Do We Evaluate Tokenizers?")
