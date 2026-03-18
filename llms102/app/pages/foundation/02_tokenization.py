@@ -791,7 +791,7 @@ with st.expander("References", expanded=False):
         - [Large Language Models Lack Understanding of Character Composition of Words (arXiv:2405.11357v3)](https://arxiv.org/html/2405.11357v3)
     """)
 
-st.subheader("Arithmetic operations")
+st.subheader("The numbers, what do they mean?")
 
 st.markdown("""
 In [Integer tokenization is insane](https://www.beren.io/2023-02-04-Integer-tokenization-is-insane/), the author discusses how numbers are tokenized. The issues are similar as the strawberry split case we discussed above. 
@@ -813,7 +813,7 @@ with st.expander("References", expanded=False):
 st.subheader("Parlez-vous français ? ¿Hablas español? ಕನ್ನಡ ಬರತ್ತಾ?")
 
 st.markdown("""
-As someone who speaks three languages, I have never seen a rant against tokenizers as passionate and moving as [Omar Kamali's recent article](https://huggingface.co/blog/omarkamali/tokenization)
+As someone who speaks three languages, I have never seen a rant against tokenizers as impassioned and moving as [Omar Kamali's recent article](https://huggingface.co/blog/omarkamali/tokenization). There is a wealth of information he provides, and it was by far the best written article I came across on issues related to multilingual tokenization, so I will focus only on this. 
             
 In his article, he discusses morphological boundaries, segmentation issues, and other things we have already covered. That said, he is also the author behind Wikilangs, training 1800+ NLP models across 340+ languages, so he has quite a bit to say. 
             
@@ -829,7 +829,7 @@ st.image(
 st.markdown("""
 Why cannot we use a new tokenizer for each language then? We can, and it is often done, but there is one major practical hurdle to overcome. 
             
-Most of the data we have on the internet is written in English. This is what we use as a pretraining corpus, with several other languages being severely underrepresented. It doesn't mean they have no literature, but that this literature is not as widely and easily available. If Wikipedia is to be believed, here are the statistics. In fact, Hindi, spoken by more than 600 million people, appears in less than 0.1% webpages
+Most of the data we have on the internet is written in English. The internet is what we use as a pretraining corpus, with several other languages being severely underrepresented. It doesn't mean they have no literature, but that this literature is not as widely and easily available. If Wikipedia is to be believed, here are the statistics as of Dec 2025. In fact, Hindi, spoken by more than 600 million people, appears in less than 0.1% webpages
 """)
 
 data = {
@@ -868,6 +868,8 @@ st.markdown("""
 None of these observations are nearly as interesting as the one on frontier models. With models like Gemma and Qwen 3.5, they used a massive vocabulary size of 250k tokens to improve representation for each language. This means that the tokenizer managed to find representations for languages sharing the same script, such as Arabic, Cyrillic, Latin etc. and created tokens that may not have any real morphological boundaries since they combine features from different languages. 
             
 Since there is significant loss of underlying linguistic information, the middle layers of the model end up spending a lot of time reconstructing the language from these largely farcical boundaries which were easy to scale but represent no real value. The model works, and learns how to construct the language regardless, but it pays a massive price in terms of using a large amount of capacity simply modelling these ill-conditioned tokens, and not using it on reasoning or other tasks. 
+            
+He mentions how in the real world, for his own company's product using these frontier model, customers note that when models are used for high resource languages such as French or English tend to work very well, but the moment they use a low resource language such as Darija, there are often catastrophic failures. 
 """)
 
 st.markdown("""
@@ -876,10 +878,34 @@ The funniest realisation however was that some researchers discovered in the cas
 
 st.info("The most robust tokenizer in production today might be a JPEG encoder")
 
+st.divider()
+
+st.header("Conclusion")
+
 st.markdown("""
-**Further reading**
-- Sennrich et al. (2016) — [Neural Machine Translation of Rare Words with Subword Units](https://arxiv.org/abs/1508.07909)
-- Kudo & Richardson (2018) — [SentencePiece](https://arxiv.org/abs/1808.06226)
-- Kudo (2018) — [Subword Regularization](https://arxiv.org/abs/1804.10959)
-- [HuggingFace Tokenizer Docs](https://huggingface.co/docs/transformers/tokenizer_summary)
+It's not all doom and gloom though. There are several promising approaches that eliminate the tokenization step entirely, making the model an end to end system. [Byte Latent Transformer (arxiv:2412.09871)](https://arxiv.org/pdf/2412.09871) is a recent paper that encodes bytes into dynamically sized patches, and comes close to performance of LLMs at scale. Regardless, as mentioned, tokenization is here to stay for now. 
+            
+I value brevity, but it should be apparent that discussing these issues at length was more than necessary. For the most part, it is unlikely any of us will ever build custom tokenizers, and in general off the shelf ones work quite well. That said, knowing these details helps us better use the tokenizers to our benefit. Current LLMs are a two step system, therefore ignoring the first step comes at our own peril. 
+            
+Technical details on the construction of specific algorithms were omitted entirely, considering that we do not necessarily need to fiddle with them, and the fact that there are several tutorials written far better than I would have been able to elaborate on. Apart from the URLs provided within the tutorial, I am attaching a few more below for the interested reader. 
+""")
+
+
+st.markdown("""
+## Tokenizer Reading List
+
+- [Let's Build the GPT Tokenizer](https://www.youtube.com/watch?v=zduSFxRajkE) — Karpathy builds BPE from scratch; the definitive explainer on why tokenizers cause weird LLM failures.
+- [Evaluating Tokenizer Performance Across Official Indian Languages](https://arxiv.org/abs/2411.12240) — Benchmarks 12 LLMs across 22 Indian languages, exposing how badly standard tokenizers fail non-Latin scripts.
+- [Let's Build the GPT Tokenizer: A Complete Guide](https://www.fast.ai/posts/2025-10-16-karpathy-tokenizers) — The Karpathy video as an annotated, runnable book chapter.
+- [Tokenizers — HuggingFace LLM Course](https://huggingface.co/learn/llm-course/en/chapter2/4) — Clean primer on word, character, and subword tokenization with hands-on code.
+- [minbpe](https://github.com/karpathy/minbpe) — Minimal BPE implementation — clone it, run it, learn it.
+- [minbpe-pytorch](https://github.com/kuprel/minbpe-pytorch) — minbpe with CUDA support, 120x speedup — shows how BPE scales to GPU.
+- [Good tokenizers is all you need](https://augustasmacijauskas.github.io/personal-website/posts/tokenizer-problems/tokenizer-problems.html) — Pushes back on tokenizer doom narratives with concrete evidence from Llama 3.
+- [TrailToken](https://augustasmacijauskas.github.io/trailtoken/) — Interactive side-by-side tokenizer comparison across models, no code needed.
+- [Getting the Most Out of Your Tokenizer](https://arxiv.org/abs/2402.01035) — Shows how tokenizer choices cascade into speed, memory, and downstream task performance.
+- [Toward a Theory of Tokenization in LLMs](https://arxiv.org/pdf/2404.08335) — One of the first formal theoretical treatments of why tokenization works at all.
+- [Tokenization is Killing our Multilingual LLM Dream](https://huggingface.co/blog/omarkamali/tokenization) — Vivid case for how bad token boundaries compound into systemic failure for low-resource languages.
+- [Sarvam-1](https://www.sarvam.ai/blogs/sarvam-1) — Ground-up 2B model with a custom tokenizer 2–4x more efficient than multilingual baselines — tokenizer design in practice.
+- [Open-Sourcing Sarvam 30B and 105B](https://www.sarvam.ai/blogs/sarvam-30b-105b) — Full-stack sovereign models where tokenizer optimisation is explicitly credited for latency and inference efficiency gains across 22 Indian languages.
+- [Bulbul V3](https://www.sarvam.ai/blogs/bulbul-v3) — Production TTS for Indian languages; a downstream reminder that every voice token mispronounced traces back to how the tokenizer handled the script.
 """)
