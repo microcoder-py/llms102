@@ -51,10 +51,13 @@ With tokenization, we split up the language space into discrete chunks that we w
             
 The answer to that, is embeddings. Embeddings project the tokens into a continous space, which is where each token receives a unique position in a vector space such that the interactions between each vector are encoded to help us exploit the statistical relations. 
 
-Imagine if you joined Hogwarts, and were assigned an admission number (i.e. token ID). Currently, you have no information about yourself other than the fact you are a prospective student in a sea of several. Out comes the sorting hat, places you in the house you desire and deserve, which makes the sorting hat the embedding layer. Suddenly, your token ID has meaning. It determines what your interactions with fellow students will be, what you will study, how you comport yourself, etc. The presence of this rich information models how you live through school, which is what we are truly looking for. Do remember, the wand is only to be used in public life under the most serious of circumstances - that holds true for all of you. 
-            
-> As a playful side note, a single forward pass in this neural network (Hogwarts) takes 7 years to execute, so they implemented parallel execution (different years study at the same time) and group query attention (classrooms share common knowledge with more than one person at the same time) to improve efficiency. It really is wizardry! Voldemort in this case would simply be a bad batch of data, causing training instability, but the Dumbledore optimizer was more than prepared to smoothen out the training curve. I dare say the horcruxes would then be tokenization artifacts arising from poor morphological segmentation of the name 'Voldemort', as we discussed in the last chapter. 
+Imagine if you joined Hogwarts, and were assigned an admission number (i.e. token ID). Currently, you have no information about yourself other than the fact you are a prospective student in a sea of several. Out comes the sorting hat, places you in the house you desire and deserve, which makes the sorting hat the embedding layer. Suddenly, your token ID has meaning. It determines what your interactions with fellow students will be, what you will study, how you comport yourself, etc. The presence of this rich information models how you live through school, which is what we are truly looking for. Do remember, the wand is only to be used in public life under the most serious of circumstances - that holds true for all of you.  
 """)  
+
+with st.expander("A side note (that I came up with)", expanded = False):
+    st.markdown("""
+        As a playful side note, a single forward pass in this neural network (Hogwarts) takes 7 years to execute, so they implemented parallel execution (different years study at the same time) and group query attention (classrooms share common knowledge with more than one person at the same time) to improve efficiency. It really is wizardry! Voldemort in this case would simply be a bad batch of data, causing training instability, but the Dumbledore optimizer was more than prepared to smoothen out the training curve. I dare say the horcruxes would then be tokenization artifacts arising from poor morphological segmentation of the name 'Voldemort', as we discussed in the last chapter.
+    """) 
 
 st.divider()
 
@@ -152,11 +155,6 @@ if token_input:
     fig.update_layout(showlegend=False, coloraxis_showscale=False)
     col2.plotly_chart(fig, use_container_width=True)
 
-st.caption(
-    "Embeddings generated using sentence-transformers/all-MiniLM-L6-v2 for demonstration. "
-    "Real Word2Vec embeddings follow the same structure."
-)
-
 st.markdown("""
 Watching these values, however, provides us only the representation. As always, we ask, what do the numbers mean? 
             
@@ -217,7 +215,7 @@ st.markdown("Additionally, since these are vectors, common operations such as di
 st.markdown("""
 For instance, the vector directed between `king` and `man` should ideally have similar direction and magnitude as the one between `queen` and `woman`, since the gender is the core separating factor here.
             
-Of course, the actual values depend heavily on how well the relations were encoded, which is a model specific detail, but in general the principle holds. 
+Of course, the actual values depend heavily on how well the relations were encoded, which is a model specific detail, but in general the principle holds. Let us calculate the cosine similarity (i.e. direction alignment, `[0, 1]`) for the following subtracted vectors 
 """)
 
 pair_choice = st.selectbox("Choose a pair", options=list(PAIRS.keys()))
@@ -230,14 +228,14 @@ vec_b = get_embedding(word_b1) - get_embedding(word_b2)
 similarity = cosine_similarity(vec_a, vec_b)
 
 col1, col2, col3 = st.columns(3)
-col1.metric(f"{word_a1} − {word_a2}", "direction A")
-col2.metric(f"{word_b1} − {word_b2}", "direction B")
+col1.metric("direction A", f"{word_a1} − {word_a2}")
+col2.metric("direction B", f"{word_b1} − {word_b2}")
 col3.metric("Cosine similarity", f"{similarity:.3f}")
 
 st.caption(
     f"If embeddings encode this relationship consistently, both directions "
     f"should point the same way in vector space. "
-    f"Similarity of {similarity:.3f} {'supports this' if similarity > 0.5 else 'suggests the relationship is not strongly encoded'}."
+    f"Cosine similarity of {similarity:.3f} {'supports this' if similarity > 0.5 else 'suggests the relationship is not strongly encoded'}."
 )
 st.divider()
 
@@ -259,13 +257,18 @@ st.divider()
 
 # ─── Footer ──────────────────────────────────────────────────────────────────
 
-col1, col2 = st.columns([1, 5])
-col1.page_link("pages/architecture/04_attention.py", label="Next: Attention →")
 
 st.markdown("""
 **Further reading**
-- Mikolov et al. (2013) — [Efficient Estimation of Word Representations](https://arxiv.org/abs/1301.3781)
-- Mikolov et al. (2013) — [Linguistic Regularities in Word Representations](https://arxiv.org/abs/1309.4168)
-- Devlin et al. (2018) — [BERT](https://arxiv.org/abs/1810.04805)
+- Mikolov et al. (2013) — [Efficient Estimation of Word Representations in Vector Space](https://arxiv.org/abs/1301.3781)
+- Mikolov et al. (2013) — [Exploiting Similarities among Languages for Machine Translation](https://arxiv.org/abs/1309.4168)
+- Pennington et al. (2014) — [GloVe: Global Vectors for Word Representation](https://nlp.stanford.edu/pubs/glove.pdf)
+- Bojanowski et al. (2017) — [Enriching Word Vectors with Subword Information (FastText)](https://arxiv.org/abs/1607.04606)
+- Devlin et al. (2018) — [BERT: Pre-training of Deep Bidirectional Transformers](https://arxiv.org/abs/1810.04805)
 - Bengio et al. (2003) — [A Neural Probabilistic Language Model](https://www.jmlr.org/papers/volume3/bengio03a/bengio03a.pdf)
+- Peters et al. (2018) — [Deep Contextualized Word Representations (ELMo)](https://arxiv.org/abs/1802.05365)
+- Reimers & Gurevych (2019) — [Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks](https://arxiv.org/abs/1908.10084)
 """)
+st.divider()
+col1, col2 = st.columns([1, 5])
+col1.page_link("pages/architecture/04_attention.py", label="Next: Attention →")
