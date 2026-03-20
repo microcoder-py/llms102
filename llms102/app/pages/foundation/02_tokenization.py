@@ -495,6 +495,64 @@ st.markdown("""
 As we saw above, each tokenizer has distinct steps to it. Not all tokenizers use normalization, pre-tokenization may be different or absent, the underlying model for tokenization may be different, and the postprocessing may be different. There are too many different algorithms to cover, so here we will discuss primarily the ways in which designs are split, and provide reference material for anyone interested. 
 """)
 
+st.subheader("Main concerns with tokenization")
+
+st.markdown("""
+Let's run a simple walkthrough with the example sentence `Finish this sentence in three hundred words`, and the expected output is `The sentence is finished` 
+            
+Let's assume that we split it by character. That gives us 42 input tokens, amd 24 output tokens with some but not all linguistic information retained, since linguistic information appears at the morpheme level, and not character. This means that we need to prefill 42 tokens (all known tokens are loaded in), and generate 24 more, which is an extremely large number of steps. We managed to shrink vocabulary size, at the cost of accuracy and inference time. 
+            
+So what if we just tokenize it by word? That only gives us 7 input tokens, and 4 output tokens. Goodness, we just reduced it from 66 tokens to 11! Well, there are still some other issues. 
+            
+First, the vocabulary size explodes. Each unique word demands a new token, meaning that any typos, variations in dialect, etc. need to be explicitly taken care of. This does not even scratch the surface of the number of training samples we would require per token - the data sparsity will be extremely high, and gradient updates on a per token level would be infrequent. Now imagine expanding this to beyond one language. 
+            
+That is not the only concern, however. Let's consider what happens to the model size with change in vocabulary size.
+
+### Vocabulary Size vs. Model Parameters 
+""")
+
+st.info("Don't worry if you don't know what the underlying names of the layers are, we will be covering that later - for now just read along, and recognize that there will be a massive increase in parameter bloat. ")
+
+st.markdown("""
+
+**Assumptions (7B Base Model)**
+
+- **Embedding dim:** 4,096
+- **Layers:** 32
+- **Attention heads:** 32
+- **FFN hidden dim:** 11,008 (LLaMA-style)
+- **Non-vocabulary params** (attention + FFN across all layers): ~6.7B (fixed)
+- **Vocab params** = `2 × vocab_size × embedding_dim` (embedding matrix + LM head)
+
+**Parameter Cost by Vocabulary Size**
+
+| Vocab Size | Embedding Matrix | LM Head | Vocab Params Total | Total Model Params | Vocab % of Model |
+|---|---|---|---|---|---|
+| 50,000 | 204.8M | 204.8M | 409.6M | ~7.11B | ~5.8% |
+| 100,000 | 409.6M | 409.6M | 819.2M | ~7.52B | ~10.9% |
+| 200,000 | 819.2M | 819.2M | 1.64B | ~8.34B | ~19.6% |
+| 500,000 | 2.05B | 2.05B | 4.10B | ~10.8B | ~38.0% |
+| 1,000,000 | 4.10B | 4.10B | 8.19B | ~14.89B | ~55.0% |
+
+- At **50k–100k** vocab (most modern LLMs), vocabulary params are a modest 6–11% overhead.
+- At **500k**, vocabulary params start dominating, pushing what was a 7B model closer to an 11B model in memory footprint.
+- At **1M**, the vocabulary alone contributes more parameters than the entire rest of the transformer — over half the model is just token embeddings.
+
+We have, in effect, increased the size of the model by several billion parameters, without any gain in performance or efficiency - just in vocabulary representation. Additionally, we have to contend with more data since we increased the number of parameters. It also makes language modelling hard, since the number of classes to distinguish between has increased considerably.  
+            
+Obviously, the above is an over-simplified analysis. We haven't considered weight tying, optimizations, none of it. We also haven't changed hidden dimensions of the inner layers which may in fact need to be increased to accomodate the increase in representational size, but this is sufficient to understand the issues at hand. 
+""")
+
+st.subheader("Subword Tokenization")
+
+st.markdown("""
+In practice, we use subword based tokenization. We split up words based on specific boundaries, which we identify via algorithms and methods discussed below. For instance, the word `unbelievable` could be split up as `[un, believe, able]`, because it is a compositional word. This offers us another advantage - the model is now able to see `un` as a term of negation, and `able` as a term of capability, and better assign it the right embedding in the vector space. 
+            
+This helps us preserve morphological segments far better, and reduces vocabulary size, avoiding the above issues. Let's now take a quick look at how this is done 
+""")
+
+st.info("**Please Note**: There are other tokenization methods as well, including at character or other levels of granularity, but at scale, subword tokenization is what is most commonly used. The interested reader may explore further")
+
 st.subheader("Tokenization Model")
 
 st.markdown("""
