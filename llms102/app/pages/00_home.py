@@ -56,13 +56,18 @@ render_section({
     "Embeddings": ("How tokens become continuous vectors that capture meaning.", "pages/foundation/03_embeddings.py"),
 })
 
+st.subheader("Architecture")
+render_section({
+    "Attention": ("The mechanism that lets every token relate to every other token.", "pages/architecture/04_attention.py")
+})
+
+
 st.divider()
 
-with st.expander("To be completed", expanded = False):
+with st.expander("Coming Soon", expanded = False):
 
     st.subheader("Architecture")
     render_section({
-        "Attention": ("The mechanism that lets every token relate to every other token.", "pages/architecture/04_attention.py"),
         "Multi-Head Attention": ("Running attention in parallel to capture multiple relationships.", "pages/architecture/05_multi_head_attention.py"),
         "Feedforward Layers": ("How the model transforms representations after attention.", "pages/architecture/06_feedforward.py"),
         "Layer Norm & Residuals": ("How deep networks stay stable and gradients keep flowing.", "pages/architecture/07_layer_norm_residuals.py"),
