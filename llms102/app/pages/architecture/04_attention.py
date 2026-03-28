@@ -589,7 +589,7 @@ st.markdown("The code is fairly self explanatory, just make sure you understand 
 show_source("llms102/llm_lib/architecture/attention.py")
 
 run_it_yourself("""
-from llm_lib.architecture.attention import ScaledDotProductAttention
+from llm_lib.architecture.attention import SelfAttention
 
 embedding_dim = 128
 proj_dim = 32

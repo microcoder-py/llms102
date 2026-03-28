@@ -5,6 +5,8 @@ class SelfAttention(nn.Module):
     def __init__(self, embedding_dims, proj_dim):
       super().__init__()
 
+      #Typically you'd use a linear layer to include bias, 
+      #omitting for code clarity. 
       self.w_q = nn.Parameter(torch.randn(embedding_dims, proj_dim))
       self.w_k = nn.Parameter(torch.randn(embedding_dims, proj_dim))
       self.w_v = nn.Parameter(torch.randn(embedding_dims, proj_dim))
