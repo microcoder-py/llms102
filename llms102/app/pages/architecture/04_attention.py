@@ -4,7 +4,7 @@ import streamlit as st
 import numpy as np
 import plotly.express as px
 import pandas as pd
-
+from utils.code_loader import show_source, run_it_yourself
 st.set_page_config(page_title="Attention | llms102", layout="wide")
 
 # ─── Hero ────────────────────────────────────────────────────────────────────
@@ -332,7 +332,7 @@ We mentioned the ${\sqrt{d_k}}$ term that smooths out the distribution of the at
             
 This function in particular is known well for pushing a high level of separation between values, since it creates a probability distribution between 0-1. To avoid excess squishing (and therefore loss) of information, we smoothen out the distribution and make it less 'peaky'. 
             
-The value ${\sqrt{d_k}}$ was mentioned to be used for scaling in the paper, but the theory was not explained explicitly. Some sources suggest it is based on the variance of the attention matrix. Since the matrix contains the dot product between $d_k$ terms, the variance of the matrix scales proportionally to $d_k$. Larger $d_k$ would create excess separation between peaks and lows, so scaling by $\sqrt{d_k}$ is applied. I would advise the reader to find their own sources as well, since I cannot unequivocally verify this at present.
+The value ${\sqrt{d_k}}$ was mentioned to be used for scaling in the paper, but the theory was not explained explicitly. [Some sources](https://magazine.sebastianraschka.com/p/understanding-and-coding-self-attention) suggest it is based on the variance of the attention matrix. Since the matrix contains the dot product between $d_k$ terms, the variance of the matrix scales proportionally to $d_k$. Larger $d_k$ would create excess separation between peaks and lows, so scaling by $\sqrt{d_k}$ is applied. I would advise the reader to find their own sources as well, since I cannot unequivocally verify this at present.
 
 Here is a simple demonstration of what happens when we apply above smoothing to eight tokens. Do try and change the embedding dimensions of the projections.             
 """)  
@@ -584,6 +584,24 @@ fig.update_layout(height=550)
 
 st.plotly_chart(fig, use_container_width=True)
 st.divider()
+st.header("Code Implementation")
+st.markdown("The code is fairly self explanatory, just make sure you understand the shapes correctly. It simply implements the formula")
+show_source("llms102/llm_lib/architecture/attention.py")
+
+run_it_yourself("""
+from llm_lib.architecture.attention import SelfAttention
+
+embedding_dim = 128
+proj_dim = 32
+seq_len = 100
+batch_size = 10
+
+attention = Attention(embedding_dim, proj_dim)
+
+test_tokens = torch.randn(batch_size, seq_len, embedding_dim)
+
+attention(test_tokens).shape
+""")
 
 st.header("Conclusion")
 
