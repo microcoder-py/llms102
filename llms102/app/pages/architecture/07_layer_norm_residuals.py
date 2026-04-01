@@ -146,29 +146,31 @@ Intuitively, it also means that the inputs are not being remodelled entirely - t
 st.header("Layer normalisation")
 
 st.markdown("""
-We've seen how to make sure a learning signal is reaching all the layers by using residual connections. However, we haven't yet tempered the learning signal itself. If the activations themselves start to explode, gradients will deteriorate, and the learning signal being passed back will be poor in quality. 
+We've seen how to make sure a learning signal is reaching all the layers by using residual connections. However, we haven't yet tempered the learning signal itself. If the activations themselves start to explode/vanish, gradients will deteriorate, and the learning signal being passed back will be poor in quality. 
 
-            
-""")  # study: Ba et al. 2016 — Layer Normalization arxiv 1607.06450
-                 # answer: what happens without normalisation — activations explode
-                 #         layer norm normalises each token independently
-                 #         mean 0 variance 1 across the embedding dimension
-                 #         learnable scale and shift — gamma and beta
+There is a problem formally referred to as **internal covariate shift**, which basically means that when layers interact with each other, after processing, there is significant shift in the data distribution. This theory was systematically studied in Ioffe et. al, 2015 - [Batch Normalization: Accelerating Deep Network Training by Reducing Internal Covariate Shift](https://arxiv.org/pdf/1502.03167), one of the first succesful implementations of normalization of any kind. 
 
+It was established previously that network training converges faster if inputs are 'whitened' - i.e. linearly transformed to have zero means and unit variances. The authors then assert that in deeper networks, each layer provides input to the next. Therefore, would whitening the inputs at each step help in stabilization? In particular, the authors suggest that the normalization step needs to be a part of the gradient flow as well, so that the layer adapts and helps the other layers adapt to these changes to inputs. The empirical answer was yes, although later ablations on BatchNorm seem to provide a different theoretical basis. Regardless, it's clear that normalization is beneficial while training deep networks. 
+
+We don't use batchnorm in LLMs for the most part. We use LayerNorm (or its variants). LayerNorm performs this normalization per-token as opposed to per batch or sequence. The original LayerNorm paper provides plenty of theoretical basis for why it works, including the deeper geometric analysis, and is recommended. Let's take a look at the formula
+""")  
 st.latex(r"\text{LayerNorm}(x) = \gamma \cdot \frac{x - \mu}{\sigma + \epsilon} + \beta")
 
-st.markdown("")  # answer: what gamma and beta do,
-                 #         why epsilon — numerical stability,
-                 #         difference from batch norm — why batch norm fails for sequences
-
-st.markdown("Ba et al. (2016) — [Layer Normalization](https://arxiv.org/abs/1607.06450)")
+st.markdown(r"""
+Here, $\mu$ is the mean of $x$, $\sigma$ is the standard deviation, and $\gamma$ is a learned parameter, while $\beta$ is the bias. Let's develop an intuition for what we are seeing here
+            
+1. First, we recenter the distribution around 0. This is the subtraction from mean term in the numerator 
+2. Next, we normalize the variance of the distribution dividing by the standard deviation (plus some small constant for numerical stability). Remember that $\sigma^2(x) = \frac{1}{n}\sum_{i=1}^{n}(x_i - \mu)^2$. Therefore, the variance of the normalized values becomes 1. The reader is invited to derive this by themselves using the formulae provided. $\epsilon$ is added for numerical stability in case the variance of the input distribution is too small, causing very large division
+3. Now, we have normalized the values. But what if the layer actually needed rescaling to converge better? What if by forcing all values to be bounded with our linear transform, we have reduced the expressivity of the network? Therefore, we add a gain parameter, $\gamma$. This is a vector of the same dimensions as $x$, providing a per-dimension scaling factor, learned during training 
+4. Bias is added as a secondary learned parameter
+""")  
+st.markdown("> Ba et al. (2016) — [Layer Normalization](https://arxiv.org/abs/1607.06450)")
 
 # ── layer norm widget ─────────────────────────────────────────────────────────
 
-st.subheader("Layer normalisation — interactive")
+st.markdown("**Layer normalisation — interactive**")
 
-st.markdown("")  # one sentence directing the reader
-
+st.markdown("Below, you can see the effects of LayerNorm on random inputs. The distribution is much smoother, and passing this through ReLU or other non-linearities should result in lesser neurons dying. Additionally, gradients will flow more smoothly (since we need smaller updates per input), resulting in lesser variance of output and gradient values.")  # one sentence directing the reader
 np.random.seed(42)
 raw = np.random.randn(16) * 5 + 3
 
@@ -176,8 +178,14 @@ mean = raw.mean()
 std = raw.std()
 normalised = (raw - mean) / (std + 1e-5)
 
+# Compute shared symmetric y-axis range
+abs_max = max(np.abs(raw).max(), np.abs(normalised).max())
+y_range = [-abs_max, abs_max]
+
+# Layout
 col1, col2 = st.columns(2)
 
+# Before LayerNorm
 fig1 = px.bar(
     x=list(range(16)), y=raw,
     title=f"Before LayerNorm (mean={mean:.2f}, std={std:.2f})",
@@ -185,88 +193,122 @@ fig1 = px.bar(
     color=raw, color_continuous_scale="RdBu"
 )
 fig1.update_layout(showlegend=False, coloraxis_showscale=False, height=350)
+fig1.update_yaxes(range=y_range)
 col1.plotly_chart(fig1, use_container_width=True)
 
+# After LayerNorm
 fig2 = px.bar(
     x=list(range(16)), y=normalised,
-    title=f"After LayerNorm (mean≈0, std≈1)",
+    title="After LayerNorm (mean≈0, std≈1)",
     labels={"x": "Dimension", "y": "Value"},
     color=normalised, color_continuous_scale="RdBu"
 )
 fig2.update_layout(showlegend=False, coloraxis_showscale=False, height=350)
+fig2.update_yaxes(range=y_range)
 col2.plotly_chart(fig2, use_container_width=True)
 
 st.divider()
 
+st.subheader("RMSNorm")
+
+st.markdown(r"""
+In LayerNorm, we first recentered the data, and then normalized it. In their paper, [Zhang & Sennrich, 2019](https://arxiv.org/abs/1910.07467) the authors found that most of these benefits can be achieved without the recentering, and simply rescaling. This turns out to be faster and their formulation also doesn't need to calculate the variance of the input, providing further speedup. The formula is 
+            
+$$
+\mathrm{RMSNorm}(x) = \gamma \cdot \frac{x}{\sqrt{\frac{1}{n}\sum_{i=1}^{n} x_i^2 + \epsilon}}          
+$$
+            
+Newer models such as Llama and Mistral series employ RMSNorm instead of LayerNorm
+""")
+
 # ─── 4. Pre-norm vs post-norm ────────────────────────────────────────────────
 
-st.header("4. Pre-norm vs post-norm")
+st.header("Where does this come within the transformer network?")
 
-st.markdown("")  # study: reason from first principles + Xiong et al. 2020 arxiv 2002.04745
+st.markdown("""
+Normalization is provided somewhere around the attention and FFN networks, the main compute units within the transformer blocks. The main question then becomes, _when_ do we apply normalization? 
+            
+Broadly speaking, there are two variants, **postnorm** and **prenorm**. 
+            
+In Post-Norm, we normalize the outputs **after** passing it through the relevant layer (MHA/FFN). Original transformers paper, BERT, etc. used this paradigm.
+            
+In Pre-Norm, we we normalize the inputs **incoming** to the relevant layer (MHA/FFN). Empirically, this has shown to provide better stability. Theoretically, recall our gradient flow equation from before. With Pre-Norm, the identity path for gradient flow occurs along the skip path directly, preserving more of the gradient signal for the input since it did not undergo rescaling or normalization. GPT-2 was the first popular model to use Pre-Norm, and it became the defacto standard for many models. Below are graphical representations of both.
+""")  # study: reason from first principles + Xiong et al. 2020 arxiv 2002.04745
                  # answer: original Vaswani paper used post-norm
                  #         modern transformers use pre-norm — more stable
                  #         pre-norm: x + sublayer(LayerNorm(x))
                  #         post-norm: LayerNorm(x + sublayer(x))
 
+def build_norm_graph(mode = "pre"):
+    dot = "digraph Residual {\n"
+    dot += 'rankdir=TB;\n'
+    dot += 'graph [pad="0.5", nodesep="0.6", ranksep="1.2"];\n'
+    dot += 'node [shape=box style="rounded,filled" fontname="Helvetica" fontsize=24 width=4];\n'
+
+    # Nodes (same vertical line)
+    dot += f'X   [label="Input", fillcolor="#E3F2FD"];\n'
+    dot += f'LN1 [label="LayerNorm", fillcolor="#E8F5E9"];\n'
+    dot += f'ATTN [label="Multi-Head Attention", fillcolor="#FFF3E0"];\n'
+    dot += f'ADD1 [label="Add (Residual)", fillcolor="#FFEBEE"];\n'
+
+    dot += f'LN2 [label="LayerNorm", fillcolor="#E8F5E9"];\n'
+    dot += f'FFN1 [label="FFN", fillcolor="#FFF3E0"];\n'
+    dot += f'ADD2 [label="Add (Residual)", fillcolor="#FFEBEE"];\n'
+    
+    dot += f'OUT [label="Output", fillcolor="#E1F5FE"];\n'
+
+    # Main vertical flow
+    if mode == "post":
+        dot += "X -> ATTN -> ADD1 -> LN1 -> FFN1 -> ADD2 -> LN2 -> OUT;\n"
+    else:
+        dot += "X -> LN1 -> ATTN -> ADD1  -> FFN1 -> LN2 ->  ADD2 -> OUT;\n"
+    # Residual connections (side arrows)
+    dot += 'X -> ADD1 [color="#E74C3C", penwidth=3];\n'
+    dot += 'ADD1 -> ADD2 [color="#E74C3C", penwidth=3];\n'
+
+    dot += "}\n"
+    return dot
+
+
+# ---- Streamlit layout fixes ----
 col1, col2 = st.columns(2)
 
 col1.markdown("**Post-norm (original)**")
 col1.latex(r"x = \text{LayerNorm}(x + \text{sublayer}(x))")
-col1.markdown("")  # one sentence — why this is less stable
 
 col2.markdown("**Pre-norm (modern standard)**")
 col2.latex(r"x = x + \text{sublayer}(\text{LayerNorm}(x))")
-col2.markdown("")  # one sentence — why this trains better
 
-st.markdown("Xiong et al. (2020) — [On Layer Normalization in the Transformer Architecture](https://arxiv.org/abs/2002.04745)")
+coln1, coln2 = st.columns([3, 3])
 
-st.divider()
 
-# ─── 5. Putting it together ───────────────────────────────────────────────────
+with coln1:
+    st.graphviz_chart(
+        build_norm_graph(mode = "post"),
+        use_container_width=True
+    )
 
-st.header("5. Putting it together")
+with coln2:
+    st.graphviz_chart(
+        build_norm_graph(mode = "pre"),
+        use_container_width=True
+    )
 
-st.markdown("")  # answer: the full pre-norm transformer sublayer
-                 #         one block = attention + FFN, each wrapped in residual + norm
-                 #         residuals carry the signal, norm stabilises it
-
-st.latex(r"""
-\begin{aligned}
-x &= x + \text{Attention}(\text{LayerNorm}(x)) \\
-x &= x + \text{FFN}(\text{LayerNorm}(x))
-\end{aligned}
+st.markdown("""
+However, these are not the only paradigms. For instance, Gemma 3 uses Pre+Post Norm. Some models use QK-Norm (i.e. normalizing the QK projections). Some models such as Olmo2 are going back to Post Norm with QK Norm, including decisions regarding when to re-add positional encoding (to be discussed in next chapter). These are architecture specific details but worth highlighting for those who may want to explore it further. The intuition regarding why we use normalization holds regardless.
 """)
 
 st.divider()
 
 # ─── 6. Implementation ───────────────────────────────────────────────────────
 
-st.header("6. Implementation")
+st.header("Implementation")
 
-st.markdown("")  # one sentence
+st.markdown("Simple implementation of the formula")  # one sentence
 
-show_source("llm_lib/architecture/layer_norm.py")
+show_source("llms102/llm_lib/architecture/layer_norm.py")
 
 st.divider()
 
-# ─── Footer ──────────────────────────────────────────────────────────────────
-
-run_it_yourself("""
-from llm_lib.architecture.layer_norm import PreNormResidual
-import torch
-
-layer = PreNormResidual(d_model=512)
-x = torch.randn(1, 10, 512)
-output = layer(x)
-print(output.shape)   # (1, 10, 512)
-""")
-
-col1, col2 = st.columns([1, 5])
+col1, col2 = st.columns([3, 5])
 col1.page_link("pages/architecture/08_positional_encoding.py", label="Next: Positional Encoding →")
-
-st.markdown("""
-**Further reading**
-- He et al. (2015) — [Deep Residual Learning for Image Recognition](https://arxiv.org/abs/1512.03385)
-- Ba et al. (2016) — [Layer Normalization](https://arxiv.org/abs/1607.06450)
-- Xiong et al. (2020) — [On Layer Normalization in the Transformer Architecture](https://arxiv.0rg/abs/2002.04745)
-""")

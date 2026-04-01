@@ -53,7 +53,7 @@ st.header("Activation functions")
 st.markdown("""
 In the attention layer, we only had linear interactions. If we trained a complete neural network with just linear transformations, the extended network would still be a linear one (composition of linear transforms), and would not be able to model complex, non-linear and non monotonic patterns. The FFN is the part of the transformer architecture that allows for this. 
             
-It is important to understand what activation functions are used. Without diving too deep, the original architecture used ReLU, but today we use other activations such as GeLU and SwiGLU. The main issue with ReLU was the non-differentiability for values at 0, which enforced excess sparsity and therefore killed a lot of gradient information. GeLU, SiLU and SwiGLU provide smoother, differentiable transitions, allowing more information to flow through. The analysis and benefits of each nonlinearity are left to the reader's perusal. 
+It is important to understand what activation functions are used. Without diving too deep, the original architecture used ReLU, but today we use other activations such as GeLU and SwiGLU. The main issue with ReLU was that it has a tendency to cause the 'dead neuron' problem (i.e. too many 0 output activations), which enforced excess sparsity and therefore killed a lot of gradient information. GeLU, SiLU and SwiGLU provide smoother, differentiable transitions, allowing more information to flow through. The analysis and benefits of each nonlinearity are left to the reader's perusal. 
 """)  
 
 x = np.linspace(-4, 4, 300)
