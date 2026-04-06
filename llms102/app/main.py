@@ -23,7 +23,7 @@ pg = st.navigation({
         st.Page("pages/architecture/06_feedforward.py", title="Feedforward Layers", icon="⚡"),
         st.Page("pages/architecture/07_layer_norm_residuals.py", title="Layer Norm & Residuals", icon="⚖️"),
         st.Page("pages/architecture/08_positional_encoding.py", title="Positional Encoding", icon="📍"),
-        st.Page("pages/architecture/09_transformer_block.py", title="Transformer Block", icon="🧱"),
+        st.Page("pages/architecture/09_transformer_block.py", title="Transformer Network", icon="🧱"),
     ],
     "Training": [
         st.Page("pages/training/10_loss_perplexity.py", title="Loss & Perplexity", icon="📉"),

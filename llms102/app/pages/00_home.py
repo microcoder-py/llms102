@@ -61,22 +61,17 @@ render_section({
     "Attention": ("The mechanism that lets every token relate to every other token.", "pages/architecture/04_attention.py")
 })
 
+render_section({
+    "Multi-Head Attention": ("Running attention in parallel to capture multiple relationships.", "pages/architecture/05_multi_head_attention.py"),
+    "Feedforward Layers": ("How the model transforms representations after attention.", "pages/architecture/06_feedforward.py"),
+    "Layer Norm & Residuals": ("How deep networks stay stable and gradients keep flowing.", "pages/architecture/07_layer_norm_residuals.py"),
+    "Positional Encoding": ("How the model knows where each token sits in a sequence.", "pages/architecture/08_positional_encoding.py"),
+    "Transformer Network": ("Putting every component together into a complete network", "pages/architecture/09_transformer_block.py"),
+})
 
 st.divider()
 
 with st.expander("Coming Soon", expanded = False):
-
-    st.subheader("Architecture")
-    render_section({
-        "Multi-Head Attention": ("Running attention in parallel to capture multiple relationships.", "pages/architecture/05_multi_head_attention.py"),
-        "Feedforward Layers": ("How the model transforms representations after attention.", "pages/architecture/06_feedforward.py"),
-        "Layer Norm & Residuals": ("How deep networks stay stable and gradients keep flowing.", "pages/architecture/07_layer_norm_residuals.py"),
-        "Positional Encoding": ("How the model knows where each token sits in a sequence.", "pages/architecture/08_positional_encoding.py"),
-        "Transformer Block": ("Putting every component together into a complete block.", "pages/architecture/09_transformer_block.py"),
-    })
-
-    st.divider()
-
     # ── Training ─────────────────────────────────────────────────────────────────
 
     st.subheader("Training")
