@@ -10,4 +10,4 @@ def run_it_yourself(code: str):
     st.divider()
     st.subheader("Run this yourself")
     st.caption("Clone the repo, pip install -e ., then run:")
-    st.code(code, language="python")
+    st.code(code, language="python", line_numbers=True, height=1000000)
