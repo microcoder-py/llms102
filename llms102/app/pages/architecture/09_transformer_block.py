@@ -261,4 +261,4 @@ show_source("llms102/llm_lib/architecture/transformer.py")
 st.divider()
 
 col1, col2 = st.columns([3, 5])
-col1.page_link("pages/training/10_loss_perplexity.py", label="Next: Positional Encoding →")
+col1.page_link("pages/training/10_loss_perplexity.py", label="Next: Loss and Perplexity →")
