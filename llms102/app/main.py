@@ -28,7 +28,6 @@ pg = st.navigation({
     "Training": [
         st.Page("pages/training/10_loss_perplexity.py", title="Loss & Perplexity", icon="📉"),
         st.Page("pages/training/11_lr_schedules.py", title="Learning Rate Schedules", icon="📈"),
-        st.Page("pages/training/12_gradient_flow.py", title="Gradient Flow", icon="🌊"),
         st.Page("pages/training/13_batch_packing.py", title="Batch & Sequence Packing", icon="📦"),
     ],
     "Causal": [

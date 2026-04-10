@@ -78,7 +78,7 @@ with st.expander("Coming Soon", expanded = False):
     render_section({
         "Loss & Perplexity": ("What the model is optimising for and how we measure it.", "pages/training/10_loss_perplexity.py"),
         "Learning Rate Schedules": ("How we control the speed of learning over time.", "pages/training/11_lr_schedules.py"),
-        "Gradient Flow": ("Why gradients vanish, explode, and how architecture prevents it.", "pages/training/12_gradient_flow.py"),
+       
         "Batch & Sequence Packing": ("How we feed data efficiently to the model.", "pages/training/13_batch_packing.py"),
     })
 

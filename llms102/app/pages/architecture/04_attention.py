@@ -446,6 +446,15 @@ As always, this does not mean attention is perfect. In further chapters such as 
 
 st.divider()
 
+st.header("Attention Masking")
+
+st.markdown("""
+When executing language modelling, we want to be able to control the flow of information between tokens. For instance, if it is our objective to perform causal language modelling (i.e. each token only depends on itself and past tokens), we want to disallow any attention flow between that token and future tokens. There could also be other cases where we want the model to capture interactions only between specific tokens because of our training methodology. 
+            
+In such cases, we apply an **Attention Mask**, where we zero out attention between tokens where there should not be any interactions. This is either done by explicitly zeroing out attention scores, or by adding a negative infinite bias to the scores so that during softmax operation they are automatically zeroed out. We will see the specifics of this in each chapter where we apply the masks. 
+""")
+st.divider()
+
 # ─── 5. Complexity ───────────────────────────────────────────────────────────
 
 st.header("The cost of attention")
