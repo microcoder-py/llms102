@@ -32,8 +32,6 @@ Each tokenizer uses different styles of both EOS and Padding tokens, make sure t
 
 st.divider()
 
-
-st.header("Issues with variable length data")
 st.header("Issues with variable length data")
 
 st.markdown("""
@@ -64,7 +62,7 @@ Empty cells indicate that the sentence has ended (no padding applied). Even with
 | Sentence 3 | I      | like   | tea     | .       | <EOS>   | <PAD>   | <PAD>   | <PAD>   |
 | Sentence 4 | Token  | ##iza  | ##tion  | helps   | model   | ##s     | .       | <EOS>   | 
             
-Notice how shorter sequences have a ton of `<PAD>` tokens because we are trying to map them to the longest possible sequence in the batch. This is incredibly wasteful, since we now have to process these zero information tokens with full GPU usage. In particular, imagine we have a dataset of 1024 sequences, each sequence is a random length with a minimum of 128 tokens. Let's visualize how many `<PAD>` tokens might appear 
+Notice how shorter sequences have a ton of `<PAD>` tokens because we are trying to map them to the longest possible sequence in the batch. This is incredibly wasteful, since we now have to process these zero information tokens with full GPU usage. Let's visualize how many `<PAD>` tokens might appear. Obviously, the closer min and max sequence lengths are, the more efficient the pipeline
 """)
 
 st.markdown("""
@@ -578,6 +576,38 @@ st.markdown(f"""
 - The last packed bin may be partially filled — its remainder counts as padding
 """)
 
+st.header("Algorithms in practice") 
+
+st.markdown("""
+It's quite clear that of the options, sequence packing is the most effective. However, we must now concern ourselves with one other question - what order are the sequences packed in? 
+            
+In particular, this is important for training stability. We don't want to train the model on sequence lengths 1024 and 128k at the same time. We first want to provide smaller sequence lengths, stabilize it for that length, then progressively increase the size of sequence length. This way, the model can use and reshape its understanding of shorter sequence lengths on longer ones. It makes the training more stable, and converges faster. 
+            
+Briefly, we want algorithms that find the best fits for sequence lengths. This is a bin packing problem - given items of varying sizes, how do we sort and store them? 
+            
+1. **Naive Concatenation** ([`ConcatenativePacker`, NeMo-RL](https://docs.nvidia.com/nemo/rl/0.5.0/_modules/nemo_rl/data/packing/algorithms.html)): This is our baseline. We simply concat sequences until a bin is full, then start the next. No sorting, no consideration of fit.
+
+2. **First Fit Decreasing (FFD)** ([`FirstFitDecreasingPacker`, NeMo-RL](https://docs.nvidia.com/nemo/rl/0.5.0/_modules/nemo_rl/data/packing/algorithms.html) / [NeMo SFT `first_fit_decreasing`](https://docs.nvidia.com/nemo-framework/user-guide/24.12/nemotoolkit/features/optimizations/sequence_packing.html)): Sort sequences longest-first, then assign each to the first bin it fits. O(n log n) to sort + O(n·m) for placement, where m is the number of bins.
+
+3. **Best Fit Decreasing (BFD)** ([`strategy="ffd"` in TRL `pack_dataset`](https://github.com/huggingface/trl/blob/main/trl/data_utils.py) — note: [labelled FFD but actually implements BFD](https://github.com/huggingface/trl/issues/3645)): Sort longest-first, but place each sequence into the *tightest* bin — the one with least remaining capacity after placement. Slightly better packing efficiency than FFD.
+
+4. **Modified First Fit Decreasing** ([`ModifiedFirstFitDecreasingPacker`, NeMo-RL](https://docs.nvidia.com/nemo/rl/0.5.0/_modules/nemo_rl/data/packing/algorithms.html) / [config](https://github.com/NVIDIA-NeMo/RL/blob/main/examples/configs/grpo_math_1B.yaml)): The Johnson & Garey (1985) MFFD heuristic. Classifies sequences into large/medium/small/tiny and uses a 6-step packing strategy (classify → one bin per large item → add medium to large bins → add pairs of small items → greedily fit remaining → FFD on leftovers) for better bin utilisation than standard FFD. Adds hardware alignment constraints — sequences are padded to multiples of `cp_size * 2 * tp_size`. Recommended default for production pretraining in NeMo-RL.
+
+5. **Length Bucketing (Dataset Decomposition)** ([`apple/ml-dataset-decomposition`](https://github.com/apple/ml-dataset-decomposition)): Rather than packing arbitrary sequences together, documents are sorted into power-of-2 length buckets. Each bucket contains sequences from a *single document*, so cross-document attention is eliminated by construction. A length-based curriculum can optionally control sampling probabilities across buckets — prioritising shorter buckets early in training — but by default sampling is uniform across all buckets.
+
+Note that "short sequences first" in all of these methods means *filtering or bucketing by natural document length* — long documents are deferred to later in training, not truncated. Truncation when it appears is a side effect of bin-packing algorithms hitting a fixed context window, and is something all of the above methods try to minimise.
+""")
+
+st.markdown("""
+After bin packing, the pipeline is:
+
+1. **Concatenation** (offline): Token IDs within each bin are concatenated into a single 1D tensor of length `pack_size`, with metadata stored alongside to mark sub-sequence boundaries.
+2. **Batching** (online, per step): The DataLoader stacks N bins into a microbatch and passes the tokens and boundary metadata to the model.
+3. **Forward pass**: The attention mechanism uses the boundary metadata to ensure tokens only attend within their own sub-sequence. Loss is computed per-token and normalized per sub-sequence.
+
+By the time a batch reaches your training loop, each sample is already a fully concatenated packed sequence.
+""")
+
 st.subheader("Implementation")
 
-st.markdown("I will provide the complete code for the above when we come across the final training loop in the decoder model training section")
+st.markdown("I will provide the complete code for the above when we come across the final training loop in the decoder model training section. That said, I would still recommend using standard implementations. They are bound to be more correct than anything I write out")
