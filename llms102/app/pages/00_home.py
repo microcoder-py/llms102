@@ -69,6 +69,13 @@ render_section({
     "Transformer Network": ("Putting every component together into a complete network", "pages/architecture/09_transformer_block.py"),
 })
 
+st.subheader("Training")
+render_section({
+        "Learning Rate Schedules": ("How we control the speed of learning over time.", "pages/training/11_lr_schedules.py"),
+       
+        "Batch & Sequence Packing": ("How we feed data efficiently to the model.", "pages/training/13_batch_packing.py"),
+    })
+
 st.divider()
 
 with st.expander("Coming Soon", expanded = False):
@@ -77,9 +84,7 @@ with st.expander("Coming Soon", expanded = False):
     st.subheader("Training")
     render_section({
         "Loss & Perplexity": ("What the model is optimising for and how we measure it.", "pages/training/10_loss_perplexity.py"),
-        "Learning Rate Schedules": ("How we control the speed of learning over time.", "pages/training/11_lr_schedules.py"),
-       
-        "Batch & Sequence Packing": ("How we feed data efficiently to the model.", "pages/training/13_batch_packing.py"),
+        
     })
 
     st.divider()
